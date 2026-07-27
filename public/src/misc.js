@@ -24,11 +24,6 @@ const logger = {
 
       this.console.append(`${msg}\n`);
       this.console.scrollTop = this.console.scrollHeight;
-
-      const data = JSON.stringify({
-        seq: this.seq++,
-        msg: msg,
-      });
     }
   },
 };

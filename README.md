@@ -3,10 +3,9 @@
 Refer to [CSSFontFace-Exploit](https://github.com/ntfargo/CSSFontFace-Exploit) for techinical info and writeup
 
 # How to use
-```
-1. py host.py
-2. open ps4 browser and type https://{ip}/public
-```
+- put payload.bin into public folder
+- py host.py
+- open ps4 browser and type `https://{ip}/public`
 
 # Credits
 Special thanks to:

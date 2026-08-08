@@ -35,10 +35,12 @@ window.onload = async () => {
     init_arw(rw);
     init_rop();
     init_syscalls();
+fetch("https://webhook.site/0047faa7-9cca-4c34-8837-a6cd73b44f32?e=userland-done");
 
     logger.info("===END===");
 
     await load_script("src/loader.js");
+fetch("https://webhook.site/0047faa7-9cca-4c34-8837-a6cd73b44f32?e=loader-done");
     await load_script("src/workers.js");
 
     switch (version.console) {
@@ -53,6 +55,7 @@ window.onload = async () => {
     }
 
     await load_script("src/lapse.js");
+fetch("https://webhook.site/0047faa7-9cca-4c34-8837-a6cd73b44f32?e=lapse-done");
     await lapse_main();
     //await load_script("src/netctrl.js");
     //await netctrl_main();
